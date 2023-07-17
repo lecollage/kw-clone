@@ -26,13 +26,6 @@ import {
 } from 'ag-grid-community';
 
 type Primitive = string | number | Date | boolean;
-type TableRows = Array<Record<string, Primitive>>;
-
-interface Table {
-  id: string;
-  header: string;
-  rows: TableRows;
-}
 
 interface DocumentRow {
   id: number;
@@ -111,7 +104,6 @@ export class AppComponent implements OnInit {
 
   onCellClicked(e: CellClickedEvent): void {}
 
-  // Example using Grid's API
   clearSelection(): void {
     this.agGrid.api.deselectAll();
   }
@@ -197,20 +189,6 @@ export class AppComponent implements OnInit {
       applyUpdate(this.ydoc, uint8Array);
       transaction.origin = `DB-UPDATE | DOC.ID:${this.currentDocumentId} | CLIENT.ID:${this.currentClientId}`;
     });
-
-    // const spreadsheet = this.ydoc.getMap<Array<Primitive>>('spreadsheet');
-    //
-    // console.log(`POSTGRES_CHANGES 2 >> current spreadsheet:`, spreadsheet);
-    // const rows: Row[] = [];
-    //
-    // for (const [key, [id, make, model, price]] of spreadsheet) {
-    //   rows.push({ id, make, model, price });
-    // }
-    //
-    // console.log(`POSTGRES_CHANGES 3 >> new rows: `, rows);
-    // console.log(`POSTGRES_CHANGES 4 >> current rows: `, this.rows);
-    //
-    // this.rows = rows;
   }
 
   private async initDocData(): Promise<void> {
@@ -230,19 +208,13 @@ export class AppComponent implements OnInit {
 
       startingData.forEach((docRow) => {
         const preparedData = docRow.serialized_document;
-
-        // console.log(`INIT >> PREPARED RESULT: `, preparedData);
         const uint8Array = new Uint8Array(preparedData as number[]);
-        // console.log(`INIT >> SELECTED RESULT to Uint8Array:`, uint8Array);
 
         Y.logUpdate(uint8Array);
 
         applyUpdate(this.ydoc, uint8Array);
       });
     });
-
-    // APPLY UPDATE TO THE OLD DOC
-    // applyUpdate(this.ydoc, uint8Array);
 
     const spreadsheet = this.ydoc.getMap<Array<Primitive>>('spreadsheet');
 
@@ -255,43 +227,9 @@ export class AppComponent implements OnInit {
     }
 
     this.rows = rows;
-
-    // const spreadsheet1: Row[] = [
-    //   { id: 'row-1', make: 'Toyota', model: 'Celica', price: 35000 },
-    //   { id: 'row-2', make: 'Ford', model: 'Mondeo', price: 32000 },
-    //   { id: 'row-3', make: 'Porsche', model: 'Boxster', price: 72000 },
-    // ];
-    // this.ydoc.transact((transaction) => {
-    //   transaction.origin = `INIT | DOC.ID:${this.currentDocumentId} | CLIENT.ID:${this.currentClientId}`;
-    //   const map = this.ydoc.getMap<Y.Array<Primitive>>('spreadsheet');
-    //
-    //   for (const { id, make, model, price } of spreadsheet1) {
-    //     console.log(`INIT >> `, { id, make, model, price });
-    //     this.rows.push({ id, make, model, price });
-    //     const arr = new Y.Array<Primitive>();
-    //     arr.push([id, make, model, price]);
-    //     map.set(id, arr);
-    //   }
-    //   console.log(`map >> `, map);
-    // });
-    //
-    // this.rows = rows;
-    //
-    // const insertResult = await this.supabase
-    //   .from('documents')
-    //   .insert({
-    //     serialized_document: Array.from(Y.encodeStateAsUpdate(this.ydoc)),
-    //     documentId: this.currentDocumentId,
-    //     clientId: this.currentClientId,
-    //   })
-    //   .select();
   }
 
   private initListeners(): void {
-    // this.ydoc.getMap('spreadsheet').observeDeep((event) => {
-    //   console.log(`observeDeep 1 >> `, event);
-    // });
-
     this.ydoc.on('update', (delta, y, z) => {
       this.onDocumentUpdate(delta, y, z);
     });
@@ -324,6 +262,7 @@ export class AppComponent implements OnInit {
 
     const spreadsheet = this.ydoc.getMap<Y.Array<Primitive>>('spreadsheet');
 
+    // update grid data
     for (const [key, [id, make, model, price]] of spreadsheet) {
       console.log(`LISTENER DOC UPDATE 2 >> `, key, { id, make, model, price });
 
