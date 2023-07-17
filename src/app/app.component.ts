@@ -3,11 +3,13 @@ import { RouterModule } from '@angular/router';
 import {
   createClient,
   REALTIME_LISTEN_TYPES,
+  RealtimePostgresChangesPayload,
+  RealtimePostgresInsertPayload,
   SupabaseClient,
 } from '@supabase/supabase-js';
-
 import * as Y from 'yjs';
-import { applyUpdate, encodeStateAsUpdate } from 'yjs';
+import { applyUpdate } from 'yjs';
+import { ulid } from 'ulid';
 
 import { AgGridAngular, AgGridModule } from 'ag-grid-angular';
 import {
@@ -15,22 +17,23 @@ import {
   CellEditingStartedEvent,
   CellEditingStoppedEvent,
   ColDef,
+  GetRowIdFunc,
+  GetRowIdParams,
+  GridApi,
   GridReadyEvent,
   RowEditingStartedEvent,
   RowEditingStoppedEvent,
 } from 'ag-grid-community';
-import { YMap } from 'yjs/dist/src/types/YMap';
 
 type Primitive = string | number | Date | boolean;
-type TableRows = Array<Record<string, Primitive>>;
 
-interface Table {
-  id: string;
-  header: string;
-  rows: TableRows;
+interface DocumentRow {
+  id: number;
+  clientId: string;
+  documentId: string;
+  serialized_document: number[];
+  created_at: string;
 }
-
-type Tables = Array<Table>;
 
 interface Row {
   id: string;
@@ -47,7 +50,11 @@ interface Row {
   styleUrls: ['./app.component.scss'],
 })
 export class AppComponent implements OnInit {
+  private gridApi!: GridApi;
+
   @ViewChild(AgGridAngular) agGrid!: AgGridAngular;
+
+  public getRowId: GetRowIdFunc = (params: GetRowIdParams) => params.data.id;
 
   public defaultColDef: ColDef = {
     flex: 1,
@@ -65,255 +72,38 @@ export class AppComponent implements OnInit {
     { field: 'price' },
   ];
 
-  public rowData: Row[] = [];
-
-  public title = 'kawa-clone';
+  public rows: Row[] = [];
 
   public supabase: SupabaseClient = createClient(
     'https://jeburdjwgjhkotxakjjf.supabase.co',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImplYnVyZGp3Z2poa290eGFrampmIiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODgzMzU4MjgsImV4cCI6MjAwMzkxMTgyOH0.ZwxfY__MpAyn7VO1SjOPVxHaAABsDw3Qpoy_CyNS-uM'
   );
 
-  // private currentCode = `test${Math.floor(Math.random() * (100 - 1 + 1)) + 1}`;
-  private currentCode = `test83`;
+  private currentDocumentId = 'delta-01H5DVT35RVFGHME0K4FFC0NGK'; //`delta-${ulid()}`;
+
+  public currentClientId = `client-${ulid()}`;
 
   private ydoc = new Y.Doc();
 
   public async ngOnInit() {
-    // let { data: user_presence, error } = await this.supabase
-    //   .from('user_presence')
-    //   .select('id');
-    //
-    // console.log(user_presence, error);
-    //
-    // const userPresence = this.supabase
-    //   .channel('custom-all-channel')
-    //   .on(
-    //     REALTIME_LISTEN_TYPES.POSTGRES_CHANGES as any,
-    //     { event: '*', schema: 'public', table: 'user_presence' },
-    //     (payload) => {
-    //       console.log('Change received!', payload);
-    //     }
-    //   )
-    //   .subscribe((payload) => {
-    //     console.log('SUBSCRIBE >> ', payload);
-    //   });
+    console.log(
+      `ngOnInit >> ID:`,
+      this.currentDocumentId,
+      this.currentClientId
+    );
 
-    ///////////////////////////
+    await this.initDocData();
+    this.initListeners();
+  }
 
-    // const ydoc = new Y.Doc();
-    // const ymap = ydoc.getMap<Tables>('table');
-    //
-    // ymap.observe((ymapEvent) => {
-    //   ymapEvent.target === ymap; // => true
-    //
-    //   // Find out what changed:
-    //   // Option 1: A set of keys that changed
-    //   ymapEvent.keysChanged; // => Set<strings>
-    //   // Option 2: Compute the differences
-    //   ymapEvent.changes.keys; // => Map<string, { action: 'add'|'update'|'delete', oldValue: any}>
-    //
-    //   // sample code.
-    //   ymapEvent.changes.keys.forEach((change, key) => {
-    //     console.log(`action >> `, change.action);
-    //
-    //     if (change.action === 'add') {
-    //       console.log(
-    //         `Property "${key}" was added. Initial value: "${JSON.stringify(
-    //           ymap.get(key)
-    //         )}".`
-    //       );
-    //     } else if (change.action === 'update') {
-    //       console.log(
-    //         `Property "${key}" was updated. New value: "${JSON.stringify(
-    //           ymap.get(key)
-    //         )}". Previous value: "${JSON.stringify(change.oldValue)}".`
-    //       );
-    //     } else if (change.action === 'delete') {
-    //       console.log(
-    //         `Property "${key}" was deleted. New value: undefined. Previous value: "${JSON.stringify(
-    //           change.oldValue
-    //         )}".`
-    //       );
-    //     }
-    //   });
-    // });
-    //
-    // const KEY_TABLES = 'tables';
-    // const rowIndex = 0;
-    // const tableId = 'table-1';
-    //
-    // // const spreadsheet: TableRow = { cell1: 1, cell2: 'test1' };
-    // // const row2: TableRow = { cell1: 2, cell2: 'test2' };
-    // const rows: TableRows = [{ cell1: 1, cell2: 'test1' }];
-    // const initTables: Tables = [
-    //   {
-    //     id: 'table-1',
-    //     header: 'Table 1',
-    //     rows,
-    //   },
-    // ];
-    //
-    // // Common methods
-    // ymap.set(KEY_TABLES, initTables);
-    //
-    // const tables = ymap.get(KEY_TABLES);
-    //
-    // if (!tables) {
-    //   return;
-    // }
-    //
-    // const tableData = tables.find((t) => t.id === tableId);
-    //
-    // if (!tableData) {
-    //   return;
-    // }
-    //
-    // const newRow = { ...tableData.rows[0], cell2: 'test3' };
-    // const newRows = tableData.rows.map((row, i) =>
-    //   i === rowIndex ? newRow : row
-    // );
-    // const newTables = tables.map((t) =>
-    //   t.id === tableId ? { ...t, rows: newRows } : t
-    // );
-    // ymap.set(KEY_TABLES, newTables);
-    //
-    // console.log(ymap.toJSON());
-
-    {
-      // SELECT DB DATA
-      const { data: startingData } = await this.supabase
-        .from('documents')
-        .select('*')
-        .eq('code', this.currentCode);
-
-      console.log(`INIT >> SELECT RESULT: `, startingData);
-
-      const preparedData = startingData
-        ? startingData[0]['serialized_document']
-        : [];
-
-      console.log(`INIT >> PREPARED RESULT: `, preparedData);
-      const uint8Array = new Uint8Array(preparedData as number[]);
-      console.log(`INIT >> SELECTED RESULT to Uint8Array:`, uint8Array);
-
-      // APPLY UPDATE TO THE OLD DOC
-      applyUpdate(this.ydoc, uint8Array);
-
-      const previousResult =
-        this.ydoc.getMap<YMap<Array<Primitive>>>('spreadsheet');
-
-      console.log(`INIT >> PREVIOUS RESULT:`, previousResult);
-      const rows = [];
-
-      for (const [key, [id, make, model, price]] of previousResult) {
-        console.log(`INIT >> `, key, { id, make, model, price });
-        rows.push({ id, make, model, price });
-      }
-
-      this.rowData = rows;
-    }
-
-    ///
-
-    // SUBSCRIBE TO CHANGES
-    this.supabase
-      .channel('table_db_changes')
-      .on(
-        REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
-        { event: '*', schema: 'public', table: 'documents' },
-        (payload) => {
-          this.processUpdate(payload);
-        }
-      )
-      .subscribe((payload, error) => {
-        console.log(
-          'documents SUBSCRIBE >> payload: ',
-          payload,
-          `; error: `,
-          error
-        );
-      });
-
-    // // BEGIN DOC
-    // const ydoc = new Y.Doc();
-    //
-    // const spreadsheet = ydoc.getMap<Array<Primitive>>('spreadsheet');
-    //
-    // // INSERT FIRST DATA
-    // spreadsheet.set('row-0', [0, 1]);
-    //
-    // console.log(ydoc.isSynced);
-    // console.log(ydoc.store);
-    // console.log(spreadsheet.get('row-0'));
-    //
-    // // save data to DB
-    // const serializedDoc = Array.from(encodeStateAsUpdate(ydoc));
-    // console.log(serializedDoc);
-    //
-    // let insertResult = await this.supabase
-    //   .from('documents')
-    //   .insert({ serialized_document: serializedDoc, code: this.currentCode });
-    //
-    // console.log(`INSERT RESULT: `, insertResult);
-    //
-    // // INSERT SECOND DATA
-    // spreadsheet.set('row-0', ['row-0', 'Toyota', 'Celica', 35000]);
-    // spreadsheet.set('row-1', ['row-1', 'Ford', 'Mondeo', 32000]);
-    // spreadsheet.set('row-2', ['row-2', 'Porsche', 'Boxster', 72000]);
-    //
-    // // UPDATE DB DATA
-    // const updateResult = await this.supabase
-    //   .from('documents')
-    //   .update({ serialized_document: Array.from(encodeStateAsUpdate(ydoc)) })
-    //   .eq('code', this.currentCode)
-    //   .select();
-    //
-    // console.log(`UPDATE RESULT: `, updateResult);
-    //
-    // // SELECT DB DATA
-    // const { data: currentData } = await this.supabase
-    //   .from('documents')
-    //   .select('*')
-    //   .eq('code', this.currentCode);
-    //
-    // console.log(`SELECT RESULT: `, currentData);
-    //
-    // const preparedData = currentData
-    //   ? currentData[0]['serialized_document']
-    //   : [];
-    //
-    // console.log(`PREPARED RESULT: `, preparedData);
-    // const uint8Array = new Uint8Array(preparedData as number[]);
-    // console.log(`SELECTED RESULT to Uint8Array:`, uint8Array);
-    //
-    // // APPLY UPDATE TO THE OLD DOC
-    // applyUpdate(ydoc, uint8Array);
-    //
-    // // APPLY UPDATE TO THE NEW DOC
-    // const ydocNew = new Y.Doc();
-    // applyUpdate(ydocNew, uint8Array);
-    //
-    // const finalResult1 = ydocNew.getMap<YMap<Array<Primitive>>>('spreadsheet');
-    //
-    // console.log(`FINAL RESULT:`, finalResult1);
-    // const rows = [];
-    //
-    // for (const [key, [id, make, model, price]] of finalResult1) {
-    //   console.log(key, { id, make, model, price });
-    //   rows.push({ id, make, model, price });
-    // }
-    //
-    // this.rowData = rows;
+  onGridReady(params: GridReadyEvent) {
+    this.gridApi = params.api;
   }
 
   updateDocument(): void {}
 
-  onGridReady(params: GridReadyEvent) {}
-
   onCellClicked(e: CellClickedEvent): void {}
 
-  // Example using Grid's API
   clearSelection(): void {
     this.agGrid.api.deselectAll();
   }
@@ -332,31 +122,15 @@ export class AppComponent implements OnInit {
 
   async onCellEditingStopped(event: CellEditingStoppedEvent<Row>) {
     console.log();
-    console.log('CELL UPDATE >> cellEditingStopped', event);
-    console.log('CELL UPDATE >> cellEditingStopped value: ', event.newValue);
+    console.log('CELL UPDATE 1 >> cellEditingStopped', event);
 
-    // // SELECT DB DATA
-    // const { data: currentData } = await this.supabase
-    //   .from('documents')
-    //   .select('*')
-    //   .eq('code', this.currentCode);
-    //
-    // console.log(`CELL UPDATE >> SELECT RESULT: `, currentData);
-    //
-    // const preparedData = currentData
-    //   ? currentData[0]['serialized_document']
-    //   : [];
-    //
-    // console.log(`CELL UPDATE >> PREPARED RESULT: `, preparedData);
-    // const uint8Array = new Uint8Array(preparedData as number[]);
-    // console.log(`CELL UPDATE >> SELECTED RESULT to Uint8Array:`, uint8Array);
+    if (event.newValue === event.oldValue) {
+      return;
+    }
 
-    // // APPLY UPDATE
-    // applyUpdate(this.ydoc, uint8Array);
+    const spreadsheet = this.ydoc.getMap<Y.Array<Primitive>>('spreadsheet');
 
-    const spreadsheet = this.ydoc.getMap<Array<Primitive>>('spreadsheet');
-
-    console.log(`CELL UPDATE >> spreadsheet:`, spreadsheet);
+    console.log(`CELL UPDATE 3 >> spreadsheet:`, spreadsheet);
 
     if (event.data?.id && spreadsheet.has(event.data?.id || '')) {
       const row = spreadsheet.get(event.data.id);
@@ -364,49 +138,177 @@ export class AppComponent implements OnInit {
       if (!row) {
         return;
       }
+
       const { id, make, model, price } = event.data;
       const newRow = [id, make, model, price];
 
-      console.log(`CELL UPDATE >> newRow: `, newRow);
+      console.log(`CELL UPDATE 4 >> newRow: `, newRow);
 
-      spreadsheet.set(event.data.id, newRow);
+      const index = this.columnDefs.findIndex((colDef) => {
+        console.log(colDef, event.column.getColId());
+        return colDef.field === event.column.getColId();
+      });
 
-      // UPDATE DB DATA
-      const updateResult = await this.supabase
-        .from('documents')
-        .update({
-          serialized_document: Array.from(encodeStateAsUpdate(this.ydoc)),
-        })
-        .eq('code', this.currentCode)
-        .select();
+      console.log(`CELL UPDATE 5 >> index: `, index);
 
-      console.log(`CELL UPDATE >> UPDATE RESULT: `, updateResult);
+      const currentYRow = spreadsheet.get(event.data.id) as Y.Array<Primitive>;
+
+      if (!currentYRow) {
+        return;
+      }
+
+      this.ydoc.transact((transaction) => {
+        if (currentYRow.get(index) !== undefined) {
+          currentYRow.delete(index);
+        }
+        currentYRow.insert(index, [event.newValue]);
+        transaction.origin = `CELL-UPDATE | DOC.ID:${this.currentDocumentId} | CLIENT.ID:${this.currentClientId}`;
+      });
+
+      // console.log(spreadsheet.toJSON());
     }
   }
 
-  private processUpdate(payload: any) {
+  private processDBUpdate(
+    payload: RealtimePostgresInsertPayload<DocumentRow>
+  ): void {
     const data = payload.new;
 
-    console.log(`processUpdate >> `, payload);
+    if (data.clientId === this.currentClientId) {
+      // console.log(`POSTGRES_CHANGES 2 >> the same clientId, return`);
+      return;
+    }
 
-    const preparedData = data ? data['serialized_document'] : [];
+    console.log(`POSTGRES_CHANGES 1 >> `, payload);
 
-    const uint8Array = new Uint8Array(preparedData as number[]);
+    const preparedData = data ? data.serialized_document : [];
+    const uint8Array = new Uint8Array(preparedData);
 
     // APPLY UPDATE TO THE OLD DOC
-    applyUpdate(this.ydoc, uint8Array);
+    this.ydoc.transact((transaction) => {
+      applyUpdate(this.ydoc, uint8Array);
+      transaction.origin = `DB-UPDATE | DOC.ID:${this.currentDocumentId} | CLIENT.ID:${this.currentClientId}`;
+    });
+  }
 
-    const previousResult =
-      this.ydoc.getMap<YMap<Array<Primitive>>>('spreadsheet');
+  private async initDocData(): Promise<void> {
+    // SELECT DB DATA
+    const { data } = await this.supabase
+      .from('documents')
+      .select('*')
+      .eq('documentId', this.currentDocumentId)
+      .order('created_at');
 
-    console.log(`processUpdate >> PREVIOUS RESULT:`, previousResult);
+    console.log(`INIT >> SELECT RESULT: `, data);
+
+    const startingData = (data || []) as DocumentRow[];
+
+    this.ydoc.transact((transaction) => {
+      transaction.origin = `INIT | DOC.ID:${this.currentDocumentId} | CLIENT.ID:${this.currentClientId}`;
+
+      startingData.forEach((docRow) => {
+        const preparedData = docRow.serialized_document;
+        const uint8Array = new Uint8Array(preparedData as number[]);
+
+        Y.logUpdate(uint8Array);
+
+        applyUpdate(this.ydoc, uint8Array);
+      });
+    });
+
+    const spreadsheet = this.ydoc.getMap<Array<Primitive>>('spreadsheet');
+
+    console.log(`INIT >> PREVIOUS RESULT:`, spreadsheet);
     const rows = [];
 
-    for (const [key, [id, make, model, price]] of previousResult) {
-      console.log(key, { id, make, model, price });
+    for (const [key, [id, make, model, price]] of spreadsheet) {
+      console.log(`INIT >> `, key, { id, make, model, price });
       rows.push({ id, make, model, price });
     }
 
-    this.rowData = rows;
+    this.rows = rows;
+  }
+
+  private initListeners(): void {
+    this.ydoc.on('update', (delta, y, z) => {
+      this.onDocumentUpdate(delta, y, z);
+    });
+
+    // SUBSCRIBE TO CHANGES
+    this.supabase
+      .channel('table_db_changes')
+      .on(
+        REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
+        { event: '*', schema: 'public', table: 'documents' },
+        (payload: RealtimePostgresChangesPayload<DocumentRow>) => {
+          this.processDBUpdate(
+            payload as RealtimePostgresInsertPayload<DocumentRow>
+          );
+        }
+      )
+      .subscribe((status, error) => {
+        console.log(`documents SUBSCRIBE >> status: ${status}; error: `, error);
+      });
+  }
+
+  private async onDocumentUpdate(
+    delta: Uint8Array,
+    origin: string,
+    doc: Y.Doc
+  ): Promise<void> {
+    console.log(`LISTENER DOC UPDATE 1 >> `, delta.length, origin, doc);
+
+    Y.logUpdate(delta);
+
+    const spreadsheet = this.ydoc.getMap<Y.Array<Primitive>>('spreadsheet');
+
+    // update grid data
+    for (const [key, [id, make, model, price]] of spreadsheet) {
+      console.log(`LISTENER DOC UPDATE 2 >> `, key, { id, make, model, price });
+
+      const currGridRow = this.rows.find((row) => row.id === key);
+      const gridRowNode = this.gridApi.getRowNode(key);
+
+      console.log(`LISTENER DOC UPDATE 3 >> `, currGridRow, gridRowNode);
+
+      if (currGridRow && gridRowNode) {
+        if (currGridRow.make !== make) {
+          gridRowNode.setDataValue('make', make);
+          currGridRow.make = make;
+          console.log(`LISTENER DOC UPDATE 3 >> update of make`);
+        }
+        if (currGridRow.model !== model) {
+          gridRowNode.setDataValue('model', model);
+          currGridRow.model = model;
+          console.log(`LISTENER DOC UPDATE 3 >> update of model`);
+        }
+        if (currGridRow.price !== price) {
+          gridRowNode.setDataValue('price', price);
+          currGridRow.price = price;
+          console.log(`LISTENER DOC UPDATE 3 >> update of price`);
+        }
+      }
+    }
+
+    console.log(`LISTENER DOC UPDATE 4 >> rows: `, this.rows);
+
+    if (
+      origin ===
+      `DB-UPDATE | DOC.ID:${this.currentDocumentId} | CLIENT.ID:${this.currentClientId}`
+    ) {
+      return;
+    }
+
+    // insert to db
+    const insertResult = await this.supabase
+      .from('documents')
+      .insert({
+        serialized_document: Array.from(delta),
+        documentId: this.currentDocumentId,
+        clientId: this.currentClientId,
+      })
+      .select();
+
+    console.log(`LISTENER DOC UPDATE FINISH >>INSERT RESULT `, insertResult);
   }
 }

@@ -9,8 +9,6 @@
   },
   "private": true,
   "dependencies": {
-    "ag-grid-community": "30.0.3",
-    "ag-grid-angular": "30.0.3",
     "@angular/animations": "~16.1.0",
     "@angular/common": "~16.1.0",
     "@angular/compiler": "~16.1.0",
@@ -21,8 +19,11 @@
     "@angular/router": "~16.1.0",
     "@nx/angular": "16.4.0",
     "@supabase/supabase-js": "^2.26.0",
+    "ag-grid-angular": "30.0.3",
+    "ag-grid-community": "30.0.3",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
+    "ulid": "^2.3.0",
     "yjs": "^13.6.6",
     "zone.js": "~0.13.0"
   },

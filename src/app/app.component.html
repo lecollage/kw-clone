@@ -1,14 +1,14 @@
-{{title}}
-<router-outlet></router-outlet>
+<div>CLIENT ID: {{currentClientId}}</div>
 
 <ag-grid-angular
         style="width: 100%; height: 100%"
         class="ag-theme-alpine"
-        [rowData]="rowData"
+        [rowData]="rows"
         [columnDefs]="columnDefs"
         [defaultColDef]="defaultColDef"
         [rowSelection]="'multiple'"
         [animateRows]="true"
+        [getRowId]="getRowId"
         (gridReady)="onGridReady($event)"
         (cellClicked)="onCellClicked($event)"
         (rowEditingStarted)="onRowEditingStarted($event)"
