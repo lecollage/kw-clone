@@ -27,7 +27,7 @@
           "./src/styles.scss"
         ],
         "scripts": [],
-        "baseHref": "kawa-clone"
+        "baseHref": "https://kawa-clone-c8836.web.app/"
       },
       "configurations": {
         "production": {
