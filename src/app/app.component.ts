@@ -42,6 +42,8 @@ interface Row {
   price: number;
 }
 
+// https://www.ag-grid.com/angular-data-grid/row-dragging-to-grid/
+
 @Component({
   standalone: true,
   imports: [RouterModule, AgGridModule],
@@ -66,7 +68,7 @@ export class AppComponent implements OnInit {
   };
 
   public columnDefs: ColDef[] = [
-    { headerName: 'Row ID', valueGetter: 'node.id' },
+    { valueGetter: 'node.id', hide: true },
     { field: 'make' },
     { field: 'model' },
     { field: 'price' },
@@ -120,7 +122,7 @@ export class AppComponent implements OnInit {
     console.log('cellEditingStarted');
   }
 
-  async onCellEditingStopped(event: CellEditingStoppedEvent<Row>) {
+  public onCellEditingStopped(event: CellEditingStoppedEvent<Row>) {
     console.log();
     console.log('CELL UPDATE 1 >> cellEditingStopped', event);
 
